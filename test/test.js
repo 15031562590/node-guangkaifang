@@ -1,6 +1,6 @@
 import {xxxx} from "../src/index.js";
 
-const xx = new xxxx("", "")
+const xx = new xxxx("233010060352", "Gx@20001118")
 const login = await xx.login()
 
 console.log(login)
