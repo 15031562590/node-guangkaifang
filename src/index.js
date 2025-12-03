@@ -1,4 +1,5 @@
 import {Requests} from "http-core";
+import * as cheerio from "cheerio/slim";
 
 export class xxxx extends Requests {
     _init_() {
@@ -43,16 +44,61 @@ export class xxxx extends Requests {
     //查课 返回的对象中必须包含 id和name {id:1,name:"课程名称"}
     async queryCourse() {
         const res = await this.instance.get("https://open.gxou.com.cn/api/user/findCourses?type=current")
-        console.log("kecheng",res.data)
-        if (res.data.ok && Array.isArray(res.data.result.learningCourses)){
+        console.log("kecheng", res.data)
+        if (res.data.ok && Array.isArray(res.data.result.learningCourses)) {
             return res.data.result.learningCourses
         }
     }
 
     // 返回的列表的对象必须有一个是否跳过的标识，也就是 pass {pass:true}
     async getChapters(course) {
-        const  res = await this.instance.get(`https://courses.gxou.com.cn/my/course/${course.id}`)
-        console.log("chapter",res.data)
+        const res = await this.instance.get(`https://courses.gxou.com.cn/my/course/${course.id}`)
+        const $ = cheerio.load(res.data);
+        const courseItems = [];
+        const $taskList = $('.js-task-list-ul');
+        $taskList.find('li.task-item').each((index, element) => {
+            const $item = $(element);
+            let name = '';
+            let id = null;
+            let pass = false;
+            const isChapterTitle = $item.hasClass('js-task-chapter');
+            const isSectionTitle = $item.find('span.title').length > 0 && $item.find('a.title').length === 0; // 例如 "第1节: 绪论"
+
+            if (isChapterTitle || isSectionTitle) {
+                name = $item.find('.title').first().text().trim();
+                id = null;
+                pass = false;
+                courseItems.push({
+                    name: name,
+                    id: id,
+                    pass: pass
+                });
+
+            } else {
+                const $titleLink = $item.find('a.title');
+                name = $titleLink.text().trim();
+                const href = $titleLink.attr('href');
+                if (href) {
+                    const urlParts = href.split('/');
+                    const taskIdStr = urlParts[urlParts.length - 2];
+                    if (!isNaN(taskIdStr)) {
+                        id = parseInt(taskIdStr, 10);
+                    }
+                }
+                const $statusIcon = $item.find('.left-menu'); // 定位到左侧图标
+                if ($statusIcon.hasClass('es-icon-done')) {
+                    pass = true;
+                }
+                if (name) {
+                    courseItems.push({
+                        name: name,
+                        id: id,
+                        pass: pass
+                    });
+                }
+            }
+        });
+        return courseItems;
     }
 
     // 要根据不同的章节类型去做不同的事情
